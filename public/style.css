@@ -1,0 +1,14 @@
+@font-face {
+    font-family: Quicksand;
+    src: url("/fonts/Quicksand/Quicksand-VariableFont_wght.ttf");
+}
+
+body {
+    /* sticky footer trick */
+    height: 100vh;
+    display: grid;
+    grid-template-rows: auto 1fr auto;
+
+    font-size: 1rem;
+    /* font-family: Quicksand; */
+}

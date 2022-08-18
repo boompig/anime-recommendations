@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Anime Recommendation Engine</title>
+
+    <link rel="stylesheet" href="/style.css">
+
+    <style>
+        [v-cloak] {
+            display: none;
+        }
+    </style>
+
+    <!-- tailwind for easy CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+
+</head>
+<!-- bg-emerald-100 -->
+<body class="">
+    <header>
+        <h1 class="text-4xl mx-auto w-full text-center py-3">Anime Recommendations</h1>
+    </header>
+    <main id="vue-root" class="w-full h-full" v-cloak>
+        <div class="wrapper max-w-xl mx-auto pt-4 h-full">
+            <section>
+                <div v-if="!animeInfo">Loading anime info database...</div>
+                <div v-if="animeInfo">
+                    <p class="py-4">Database consists of {{ Object.keys(animeInfo).length }} anime</p>
+                    <p class="pb-4">{{ Object.keys(animeInfoGenreCounts).length }} distinct genres</p>
+                    <p class="pb-4">Genre counts:</p>
+                    <ol class="pb-4">
+                        <li v-for="genre in topAnimeInfoGenres" class="list-decimal">
+                            {{ genre }} - {{ animeInfoGenreCounts[genre] }}
+                        </li>
+                    </ol>
+                </div>
+            </section>
+
+            <!-- step 1 - fetch user's MyAnimeList -->
+            <section>
+                <form v-on:submit="handleSubmit($event)"
+                class="max-w-md mx-auto bg-white shadow-md rounded px-8 pt-6 pb-8 mb-4">
+                    <div v-if="fetchError">
+                        <p class="text-red-500">{{ fetchError }}</p>
+                    </div>
+
+                    <p class="mb-2">Please enter your MyAnimeList username to get started</p>
+
+                    <fieldset>
+                        <label for="username" class="block font-bold mb-2 text-sm">Username</label>
+                        <input type="text" v-model="username" required="true" placeholder="username" id="username"
+                            class="block px-2 py-2 shadow border appearance-none leading-tight">
+                        <div class="mt-2">
+                            <button type="submit"
+                                class="bg-purple-300 text-white font-bold px-4 py-2 rounded hover:bg-purple-500">
+                                Fetch Anime List
+                            </button>
+                        </div>
+                    </fieldset>
+                </form>
+            </section>
+
+            <!-- step 2 - display some stats about the anime fetched -->
+            <section v-if="animeList">
+                <h2 class="text-2xl mx-auto text-center">{{ username }}'s Anime</h2>
+
+                <p class="my-3">You have watched {{ animeList.data.length }} anime (only looking at anime that you have rated).</p>
+
+                <h3 class="text-xl mx-auto mt-4">Recommendations</h3>
+                <div>
+                    <table class="bg-white rounded px-4 py-4 w-full">
+                        <thead>
+                            <tr class="text-left bg-gray-100 font-normal">
+                                <th>Title</th>
+                                <th>Predicted Score</th>
+                                <th>Genres</th>
+                                <th>MAL Score</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr v-for="animeId in topPredictedRatingsUnseen">
+                                <td class="anime-title">{{ animeInfo[animeId].title }} / {{ animeInfo[animeId].alternative_titles.en }}</td>
+                                <td class="predicted-rating">{{ predictedRatingsV[animeId].toFixed(2) }}</td>
+                                <td class="anime-genres">{{ animeInfo[animeId].genres.map(g => g.name).join(', ') }}</td>
+                                <td class="mal-score">{{ animeInfo[animeId].mean }}</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <h3 class="text-xl mx-auto mt-4">Least Likely Likes</h3>
+                <div>
+                    <table class="bg-white rounded px-4 py-4 w-full">
+                        <thead>
+                            <tr class="text-left bg-gray-100 font-normal">
+                                <th>Title</th>
+                                <th>Predicted Score</th>
+                                <th>Genres</th>
+                                <th>Your Score</th>
+                                <th>MAL Score</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr v-for="entry in leastLikelyLikes">
+                                <td>{{ animeInfo[entry.node.id].title }} / {{ animeInfo[entry.node.id].alternative_titles.en }}</td>
+                                <td>{{ predictedRatingsV[entry.node.id].toFixed(2) }}</td>
+                                <td>{{ animeInfo[entry.node.id].genres.map(g => g.name).join(', ') }}</td>
+                                <td>{{ entry.list_status.score }}</td>
+                                <td>{{ animeInfo[entry.node.id].mean }}</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <h3 class="text-xl mx-auto mt-4">Your Top Genres</h3>
+                <ol>
+                    <li v-for="genre in topAnimeListGenres" class="list-decimal">
+                        {{ genre }} - {{ animeListGenreCounts[genre] }} - {{ userGenreScores[genre].toFixed(2) }}
+                    </li>
+                </ol>
+
+                <h3 class="text-xl mx-auto mt-4">Your Fav Genres</h3>
+                <ol>
+                    <li v-for="genre in favAnimeListGenres" class="list-decimal" v-on:click="selectedGenre = genre"
+                        v-bind:class="{'bg-green-200': selectedGenre === genre}">
+                        {{ genre }} - {{ animeListGenreCounts[genre] }} - {{ userGenreScores[genre].toFixed(2) }}
+                    </li>
+                </ol>
+
+                <h3 class="text-xl mx-auto mt-4">Your Power Genres</h3>
+
+                <p class="my-4">You are statistically more likely to *watch* an anime in these genres than most people.
+                    This doesn't necessarily mean you'll like it. Click on a genre to see anime that you have watched in this genre.
+                </p>
+
+                <table class="bg-white rounded px-4 py-4 w-full">
+                <!-- <table class="table-auto"> -->
+                    <thead>
+                        <tr class="text-left bg-gray-100 font-normal">
+                            <th class="py-2 px-2">Genre</th>
+                            <th>Power</th>
+                            <th>Your Avg. Score</th>
+                            <th>MAL Avg. Score (your watched anime)</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr v-for="genre in powerGenres" class="list-decimal" v-bind:class="{'bg-green-200': selectedGenre === genre}"
+                            v-on:click="selectedGenre = genre">
+                            <td class="cursor-pointer py-2 px-2">{{ genre }}</td>
+                            <td>{{ powerGenresV[genre].toFixed(2) }}</td>
+                            <td>{{ userGenreScores[genre].toFixed(2) }}</td>
+                            <td>{{ globalGenreScores[genre].toFixed(2) }}</td>
+                        </tr>
+                    </tbody>
+                </table>
+
+                <div v-if="selectedGenre">
+                    <h3 class="text-xl py-2">Anime with Genre "{{ selectedGenre }}"</h3>
+                    <ol>
+                        <li v-for="anime in animeWithSelectedGenre"
+                            class="list-disc">
+                            {{ anime.title }} - your score was {{ anime.score }}
+                        </li>
+                    </ol>
+                </div>
+            </section>
+        </div>
+    </main>
+    <footer class="mx-auto w-full text-center text-sm text-gray-600 py-3">Built by Daniel Kats</footer>
+
+    <script src="https://unpkg.com/vue@3"></script>
+    <script src="index.vue.js"></script>
+</body>
+</html>

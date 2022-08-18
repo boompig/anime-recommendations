@@ -1,2 +1,16 @@
+# data
 data
+public/data
+data.zip
+
+# random downloaded junk
+public/fonts/*.zip
+
+# python
 .ipynb_checkpoints/
+
+# editor
+*.code-workspace
+
+# Mac garbage
+**/.DS_Store
